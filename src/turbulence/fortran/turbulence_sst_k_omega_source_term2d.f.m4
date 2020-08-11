@@ -51,7 +51,7 @@ c     Local variables.
 c
       INTEGER i0,i1
       REAL    fac0,fac1,fac2,fac3
-      REAL del_u_del_x,del_v_del_y,del_u_del_y,del_v_del_x
+      REAL du_dx,dv_dy,du_dy,dv_dx
 c
 c     Compute the Production term of k and omega equation.
 c
@@ -62,14 +62,14 @@ c
 c
       do i1 = ilower1,iupper1
          do i0 = ilower0,iupper0
-            del_u_del_x = fac0*(U0(i0+1,i1)-U0(i0,i1))
-            del_v_del_y = fac1*(U1(i0,i1+1)-U1(i0,i1))
-            del_u_del_y = fac2*((U0(i0+1,i1+1)-U0(i0+1,i1-1))
+            du_dx = fac0*(U0(i0+1,i1)-U0(i0,i1))
+            dv_dy = fac1*(U1(i0,i1+1)-U1(i0,i1))
+            du_dy = fac2*((U0(i0+1,i1+1)-U0(i0+1,i1-1))
      &               +(U0(i0,i1+1)-U0(i0,i1-1)))
-            del_v_del_x = fac3*((U1(i0+1,i1+1)-U1(i0-1,i1+1))
+            dv_dx = fac3*((U1(i0+1,i1+1)-U1(i0-1,i1+1))
      &               +(U1(i0+1,i1)-U1(i0-1,i1)))
-            P(i0,i1) = mut(i0,i1)*(2.d0*(del_u_del_x**2.d0+
-     &      del_v_del_y**2.d0)+(del_u_del_y+del_v_del_x)**2.d0)
+            P(i0,i1) = mut(i0,i1)*(2.d0*(du_dx**2.d0 +
+     &      dv_dy**2.d0) + (du_dy + dv_dx)**2.d0)
          enddo
       enddo
 c
@@ -124,7 +124,7 @@ c
 c
 c     Local variables.
       INTEGER i0,i1
-      REAL grad_k_dot_w
+      REAL grad_k_dot_grad_w
       REAL cross_diffusion,first_term
       REAL second_term,gamma
       REAL fac0,fac1
@@ -134,11 +134,11 @@ c
 c
       do i1 = ilower1,iupper1
         do i0 = ilower0,iupper0
-            grad_k_dot_w = (fac0*(k(i0+1,i1)-k(i0-1,i1))*(w(i0+1,i1)
+            grad_k_dot_grad_w =(fac0*(k(i0+1,i1)-k(i0-1,i1))*(w(i0+1,i1)
      &                     -w(i0-1,i1)))+ (fac1*(k(i0,i1+1)-k(i0,i1-1))
      &                     *(w(i0,i1+1)-w(i0,i1-1)))
             cross_diffusion = max((2.d0*rho(i0,i1)*sigma_w2
-     &                        *grad_k_dot_w/w(i0,i1)), 1E-10)
+     &                        *grad_k_dot_grad_w/w(i0,i1)), 1E-10)
             second_term = 4.d0*rho(i0,i1)*sigma_w2*k(i0,i1)
      &                    /(cross_diffusion*(distance(i0,i1)**2.d0))
             first_term = max((sqrt(k(i0,i1))/(beta_star*w(i0,i1)
@@ -202,9 +202,8 @@ c    Local variables.
       do i1 = ilower1,iupper1
         do i0 = ilower0,iupper0
             gamma = max((2.d0*sqrt(k(i0,i1))/(beta_star*w(i0,i1)
-     &                   *distance(i0,i1))),(500.d0*mu(i0,i1)
-     &                   /(rho(i0,i1)*w(i0,i1)*(distance(i0,i1)
-     &                   **2.d0))))
+     &              *distance(i0,i1))),(500.d0*mu(i0,i1)/(rho(i0,i1)
+     &              *w(i0,i1)*(distance(i0,i1)**2.d0))))
             F2(i0,i1) = tanh(gamma**2.d0)
         enddo
       enddo
@@ -477,7 +476,7 @@ c
 c
 c    Local variables.
       INTEGER i0,i1
-      REAL grad_k_grad_w
+      REAL grad_k_dot_grad_w
       REAL fac0,fac1
 c
       fac0 = 1.d0/(4.d0*dx(0)*dx(0))
@@ -486,11 +485,12 @@ c
 c
       do i1 = ilower1,iupper1
          do i0 = ilower0,iupper0
-         grad_k_grad_w = (fac0*((k(i0+1,i1)-k(i0-1,i1))*(w(i0+1,i1)
-     &                     -w(i0-1,i1))))+(fac1*((k(i0,i1+1)-k(i0,i1-1))
-     &                     *(w(i0,i1+1)-w(i0,i1-1))))
-         w_f(i0,i1) = w_f(i0,i1) + (2.d0*(1.d0-F1(i0,i1))*rho(i0,i1)
-     &                *sigma_w2*grad_k_grad_w/w(i0,i1))
+            grad_k_dot_grad_w = (fac0*((k(i0+1,i1)-k(i0-1,i1))*
+     &                          (w(i0+1,i1)-w(i0-1,i1))))+(fac1*
+     &                          ((k(i0,i1+1)-k(i0,i1-1))*(w(i0,i1+1)
+     &                          -w(i0,i1-1))))
+            w_f(i0,i1) = w_f(i0,i1) + (2.d0*(1.d0-F1(i0,i1))*rho(i0,i1)
+     &                *sigma_w2*grad_k_dot_grad_w/w(i0,i1))
          enddo
       enddo
 c
@@ -500,8 +500,8 @@ c
 c
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
-c     Compute tau_w = rho*u_tau*u_star
-c
+c  Compute tau_w = rho*u_tau*u_star. Here, assumed that solid velocity
+c  is zero.
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
 c
@@ -568,15 +568,15 @@ c     Local variables.
       REAL error
 c
 c
-      open(1,file='wall_shear_stress.dat')
       do i1 = trim_box_ilower1,trim_box_iupper1+1
         do i0 = trim_box_ilower0,trim_box_iupper0+1
+c
           if (((wall_location_index .eq. 0) .and.
-     &  (i0 .eq. trim_box_ilower0)).or.((wall_location_index .eq. 1)
+     &  (i0 .eq. trim_box_ilower0)) .or. ((wall_location_index .eq. 1)
      & .and. (i0 .eq. (trim_box_iupper0 + 1))) .or.
      & ((wall_location_index .eq. 2) .and.  (i1 .eq. trim_box_ilower1))
-     & .or. ((wall_location_index .eq. 3)
-     & .and.  (i1 .eq. (trim_box_iupper1 + 1)))) then
+     & .or. ((wall_location_index .eq. 3) .and.
+     & (i1 .eq. (trim_box_iupper1 + 1)))) then
           if (wall_location_index .eq. 0) then
              U_mag = abs(U1(i0,i1))
              distance = dx(0) / 2.d0
@@ -602,44 +602,43 @@ c           if (U_tau_old .ge. 1E-100) then
 c           error = huge(0_8)
 c           n = 0
 c           do while ((error .gt. 0.0001d0) .and. (n .le. 15))
-c            yplus = rho_nc*U_tau_old*distance/mu_nc
-c           U_tau_vis =  U_mag / yplus
-c           U_tau_log = U_mag / ((log(yplus)/kappa) + B)
-c           U_tau_new = (U_tau_vis**4.d0 + U_tau_log**4.d0)**0.25d0
-c           error = abs(U_tau_new - U_tau_old) / U_tau_old
-c           U_tau_old = 0.5*(U_tau_new+U_tau_old)
-c           n = n+1
+c               yplus = rho_nc * U_tau_old * distance / mu_nc
+c               U_tau_vis =  U_mag / yplus
+c               U_tau_log = U_mag / (log(yplus)/kappa + B)
+c               U_tau_new = (U_tau_vis**4.d0 + U_tau_log**4.d0)**0.25d0
+c               error = abs(U_tau_new - U_tau_old) / U_tau_old
+c               U_tau_old = 0.5 * (U_tau_new + U_tau_old)
+c               n = n+1
 c          enddo
 c        endif
-c           print *, i0, i1, rho_nc
-           U_star_log = beta_star**0.25d0 * k(i0, i1)**0.5d0
-           yplus = rho_nc*U_star_log*distance/mu_nc
-           U_tau_vis = sqrt(mu_nc * U_mag / (rho_nc*distance))
-           U_tau_log = U_mag/(log(yplus)/kappa + B)
-c           U_tau = U_tau_new
-           U_tau = (U_tau_vis**4.d0 + U_tau_log**4.d0)**0.25d0
-           U_star_vis = sqrt(mu_nc * U_mag / (rho_nc*distance))
-           U_star = (U_star_vis**4.d0 + U_star_log**4.d0)**0.25d0
-           tau_w(i0,i1) = rho_nc * U_tau * U_star
 c
-           write(1,*),i0, i1, tau_w(i0,i1)
-             if (wall_location_index .eq. 0) then
+            U_tau = U_tau_new
+            U_star_log = beta_star**0.25d0 * k(i0, i1)**0.5d0
+c           yplus = rho_nc*U_star_log*distance/mu_nc
+c           U_tau_vis = sqrt(mu_nc * U_mag / (rho_nc*distance))
+c           U_tau_log = U_mag/(log(yplus)/kappa + B)
+           
+c           U_tau = (U_tau_vis**4.d0 + U_tau_log**4.d0)**0.25d0
+            U_star_vis = sqrt(mu_nc * U_mag / (rho_nc*distance))
+            U_star = (U_star_vis**4.d0 + U_star_log**4.d0)**0.25d0
+            tau_w(i0,i1) = rho_nc * U_tau * U_star
+c
+            if (wall_location_index .eq. 0) then
                 U_tau1(i0, i1) = U_tau
                 yplus1(i0,i1) = yplus
             else if (wall_location_index .eq. 1) then
-              U_tau1(i0-1, i1) = U_tau
-              yplus1(i0-1,i1) = yplus
+                U_tau1(i0-1, i1) = U_tau
+                yplus1(i0-1,i1) = yplus
             else if (wall_location_index .eq. 2)  then
-              U_tau0(i0, i1) = U_tau
-              yplus0(i0,i1) = yplus
+                U_tau0(i0, i1) = U_tau
+                yplus0(i0,i1) = yplus
             else if (wall_location_index .eq. 3) then
-             U_tau0(i0, i1-1) = U_tau
-             yplus0(i0,i1-1) = yplus
+                U_tau0(i0, i1-1) = U_tau
+                yplus0(i0,i1-1) = yplus
             endif
          endif
         enddo
       enddo
-      close(1)
 c
 c
 c
@@ -650,7 +649,7 @@ c
 c
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
-c     Compute P_k = tau_w*U_tau/(kappa*U_mag)
+c     Compute P_k = tau_w * U_tau / (kappa * distance)
 c
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
@@ -693,7 +692,6 @@ c     output variables
 c     local variables
       INTEGER i0, i1
       REAL distance, tau_w_cc, U_tau_cc
-      open(1,file='production.dat')
       do i1 = trim_box_ilower1,trim_box_iupper1
         do i0 = trim_box_ilower0,trim_box_iupper0
            if (wall_location_index .eq. 0) then
@@ -714,11 +712,9 @@ c     local variables
             distance = dx(1) / 2.d0
           endif
            P_k(i0, i1) = tau_w_cc * U_tau_cc / (kappa * distance)
-           write(1,*),i0,i1, P_k(i0, i1)
         enddo
       enddo
 c
-      close(1)
       return
       end
 
@@ -770,30 +766,31 @@ c     Local variables.
 c
       do i1 = trim_box_ilower1,trim_box_iupper1+1
        do i0 = trim_box_ilower0,trim_box_iupper0+1
+c
          if (((wall_location_index .eq. 0) .and.
-     &  (i0 .eq. trim_box_ilower0)).or.((wall_location_index .eq. 1)
-     & .and. (i0 .eq. (trim_box_iupper0 + 1))) .or.
-     & ((wall_location_index .eq. 2) .and.  (i1 .eq. trim_box_ilower1))
-     & .or. ((wall_location_index .eq. 3) .and.
-     & (i1 .eq. (trim_box_iupper1 + 1)))) then
-        if (wall_location_index .eq. 0) then
-         U_mag = abs(U1(i0,i1))
-         distance = dx(0) / 2.d0
-       else if (wall_location_index .eq. 1) then
-         U_mag = abs(U1(i0-1,i1))
-         distance = dx(0) / 2.d0
-       else if (wall_location_index .eq. 2)  then
-         U_mag = abs(U0(i0,i1))
-         distance = dx(1) / 2.d0
-       else if (wall_location_index .eq. 3) then
-        U_mag = abs(U0(i0,i1-1))
-        distance = dx(1) / 2.d0
-       endif
+     &   (i0 .eq. trim_box_ilower0)) .or. ((wall_location_index .eq. 1)
+     &   .and. (i0 .eq. (trim_box_iupper0 + 1))) .or.
+     &   ((wall_location_index .eq. 2) .and. (i1 .eq. trim_box_ilower1))
+     &   .or. ((wall_location_index .eq. 3) .and.
+     &   (i1 .eq. (trim_box_iupper1 + 1)))) then
+c
+            if (wall_location_index .eq. 0) then
+                U_mag = abs(U1(i0,i1))
+                distance = dx(0) / 2.d0
+            else if (wall_location_index .eq. 1) then
+                U_mag = abs(U1(i0-1,i1))
+                distance = dx(0) / 2.d0
+            else if (wall_location_index .eq. 2)  then
+                U_mag = abs(U0(i0,i1))
+                distance = dx(1) / 2.d0
+            else if (wall_location_index .eq. 3) then
+                U_mag = abs(U0(i0,i1-1))
+                distance = dx(1) / 2.d0
+            endif
          mu(i0,i1) = tau_w(i0,i1) * distance / U_mag
         endif
        enddo
       enddo
 c
-
       return
       end

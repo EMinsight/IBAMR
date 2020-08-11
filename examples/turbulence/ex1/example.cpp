@@ -47,47 +47,6 @@
 // Application
 #include "SetFluidProperties.h"
 
-// FORTRAN ROUTINES
-/*#if (NDIM == 2)
-#define SKIN_FRICTION_COEF IBAMR_FC_FUNC(skin_friction_coef_2d, SKIN_FRICTION_COEF_2D)
-#endif
-#if (NDIM == 3)
-#define SKIN_FRICTION_COEF IBAMR_FC_FUNC(skin_friction_coef_3d, SKIN_FRICTION_COEF_3D)
-#endif
-
-extern "C"
-{
-void SKIN_FRICTION_COEF(const double*,
-                        const int&,
-                        const double*,
-                        const int&,
-                        const double*,
-                        const int&,
-                        const double*,
-                        const int&,
-#if (NDIM == 3)
-                        const double*,
-                        const int&,
-#endif
-                        const int&,
-                        const int&,
-                        const int&,
-                        const int&,
-#if (NDIM == 3)
-                        const int&,
-                        const int&,
-#endif
-                        const int&,
-                        const int&,
-                        const int&,
-                        const int&,
-#if (NDIM == 3)
-                        const int&,
-                        const int&,
-#endif
-                        const int&);
-}*/
-
 void compute_velocity_profile(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
                               const int U_idx,
                               double lower_coordiantes[NDIM],
@@ -104,7 +63,8 @@ void compute_Utau_and_yplus(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
 
 void compute_skin_friction_coefficient(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
                                        const int cf_idx,
-                                       const int U_idx,
+                                       const double U_ref,
+                                       const double rho_ref,
                                        const int tau_w_idx,
                                        SAMRAI::tbox::Array<int> wall_location_index,
                                        const double loop_time,
@@ -472,10 +432,12 @@ main(int argc, char* argv[])
                     wall_location_index = input_db->getIntegerArray("WALL_LOCATION_INDEX");
                 compute_Utau_and_yplus(
                     patch_hierarchy, U_tau_idx, yplus_idx, wall_location_index, loop_time, postproc_data_dump_dirname);
-
+                const double rho_ref = input_db->getDouble("RHO");
+                const double U_ref = input_db->getDouble("U_ref");
                 compute_skin_friction_coefficient(patch_hierarchy,
                                                   cf_idx,
-                                                  U_idx,
+                                                  U_ref,
+                                                  rho_ref,
                                                   tau_w_idx,
                                                   wall_location_index,
                                                   loop_time,
@@ -782,7 +744,8 @@ compute_Utau_and_yplus(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
 void
 compute_skin_friction_coefficient(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
                                   const int cf_idx,
-                                  const int U_idx,
+                                  const double U_ref,
+                                  const double rho_ref,
                                   const int tau_w_idx,
                                   SAMRAI::tbox::Array<int> wall_location_index,
                                   const double data_time,
@@ -817,8 +780,6 @@ compute_skin_friction_coefficient(Pointer<PatchHierarchy<NDIM> > patch_hierarchy
                 number_of_indices(d) = (grid_upper[d] - grid_lower[d]) / patch_dx[d];
             }
 
-            Pointer<SideData<NDIM, double> > U_data = patch->getPatchData(U_idx);
-            const IntVector<NDIM>& U_ghost_cells = U_data->getGhostCellWidth();
             Pointer<NodeData<NDIM, double> > tau_w_data = patch->getPatchData(tau_w_idx);
             Pointer<NodeData<NDIM, double> > cf_data = patch->getPatchData(cf_idx);
             if (!patch_geom->getTouchesRegularBoundary()) continue;
@@ -841,60 +802,28 @@ compute_skin_friction_coefficient(Pointer<PatchHierarchy<NDIM> > patch_hierarchy
                     }
                     Box<NDIM> trim_box = patch_box * bdry_box;
                     double c_f;
-                    for (unsigned int d = 0; d < NDIM; d++)
-                    {
+
                         for (Box<NDIM>::Iterator b(trim_box); b; b++)
                         {
-                            SideIndex<NDIM> si(b(), d, SideIndex<NDIM>::Lower);
                             NodeIndex<NDIM> ni(b(), NodeIndex<NDIM>::LowerLeft);
-                            const double x = patch_x_lower[0] + patch_dx[0] * (si(0) - patch_lower(0));
+                            const double x = patch_x_lower[0] + patch_dx[0] * (ni(0) - patch_lower(0));
 
                             // bottom boundary.
-                            if (axis == 1 && side == 0 && si(1) == 0 && d == 0)
+                            if (axis == 1 && side == 0)
                             {
-                                if (ni(axis) == 0) c_f = (*tau_w_data)(ni) / (0.5 * (*U_data)(si) * (*U_data)(si));
+                                if (ni(axis) == 0) c_f = (*tau_w_data)(ni) / (0.5 * rho_ref * U_ref * U_ref);
                                 cf.push_back(x);
                                 cf.push_back(c_f);
                             }
                             // top boundary
-                            else if (axis == 1 && side == 1 && si(1) == number_of_indices(axis) - 1 && d == 0)
+                            else if (axis == 1 && side == 1)
                             {
                                 if (ni(axis) == number_of_indices(axis))
-                                    c_f = (*tau_w_data)(ni) / (0.5 * (*U_data)(si) * (*U_data)(si));
+                                    c_f = (*tau_w_data)(ni) / (0.5 * rho_ref * U_ref * U_ref);
                                 cf.push_back(x);
                                 cf.push_back(c_f);
                             }
                         }
-                    }
-                    /*SKIN_FRICTION_COEF(cf_data->getPointer(),
-                                       cf_data->getGhostCellWidth(),
-                                       tau_w_data->getPointer(),
-                                       tau_w_data->getGhostCellWidth().max(),
-                                       U_data->getPointer(0),
-                                       U_ghost_cells(0),
-                                       U_data->getPointer(1),
-                                       U_ghost_cells(1),
-#if (NDIM == 3)
-                                       U_data->getPointer(2),
-                                       U_ghost_cells(2),
-#endif
-                                       trim_box.lower(0),
-                                       trim_box.upper(0),
-                                       trim_box.lower(1),
-                                       trim_box.upper(1),
-#if (NDIM == 3)
-                                       trim_box.lower(2),
-                                       trim_box.upper(2),
-#endif
-                                       patch_box.lower(0),
-                                       patch_box.upper(0),
-                                       patch_box.lower(1),
-                                       patch_box.upper(1),
-#if (NDIM == 3)
-                                       patch_box.lower(2),
-                                       patch_box.upper(2),
-#endif
-                                       wall_location_index[i]);*/
                 }
             }
         }

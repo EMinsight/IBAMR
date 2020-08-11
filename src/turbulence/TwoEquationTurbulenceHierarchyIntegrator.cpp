@@ -911,10 +911,6 @@ TwoEquationTurbulenceHierarchyIntegrator::preprocessIntegrateHierarchy(const dou
                                     d_integrator_time);
             d_hier_fc_data_ops->multiply(d_mass_flux_current_idx, k_u_current_idx, rho_fc_current_idx);
             d_k_convective_op->setAdvectionVelocity(d_mass_flux_current_idx);
-            std::ofstream mass_flux_c;
-            mass_flux_c.open("mass_flux_current.dat");
-            d_hier_fc_data_ops->printData(d_mass_flux_current_idx, mass_flux_c);
-            mass_flux_c.close();
         }
         else
         {
@@ -1218,12 +1214,7 @@ TwoEquationTurbulenceHierarchyIntegrator::integrateHierarchy(const double curren
             d_k_u_fcn->setDataOnPatchHierarchy(k_u_new_idx, d_k_u_var, d_hierarchy, new_time);
         }
         d_hier_fc_data_ops->linearSum(k_u_scratch_idx, 0.5, k_u_current_idx, 0.5, k_u_new_idx);
-    }
 
-    // account for the convective term
-    TimeSteppingType convective_time_stepping_type = UNKNOWN_TIME_STEPPING_TYPE;
-    if (cycle_num > 0)
-    {
     int rho_fc_new_idx = var_db->mapVariableAndContextToIndex(d_rho_fc_var, getNewContext());
     if (d_k_convective_op_type == "CUI")
     {
@@ -1251,6 +1242,8 @@ TwoEquationTurbulenceHierarchyIntegrator::integrateHierarchy(const double curren
                                 d_integrator_time);
     }
     }
+    // account for the convective term
+    TimeSteppingType convective_time_stepping_type = UNKNOWN_TIME_STEPPING_TYPE;
     if (d_k_u_var)
     {
         convective_time_stepping_type = d_k_convective_time_stepping_type;
